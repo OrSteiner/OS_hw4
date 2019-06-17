@@ -3,46 +3,52 @@
 //
 
 #include <unistd.h>
-#include <Map_List.h>
-#include <list_node.h>
 #include <stdlib.h>
 #include <cstring>
 
+
+
+
 struct metadata{
-public:
     metadata* next;
     metadata* prev;
     size_t size;
     bool is_free;
-    metadata* address;
+    void* address;
 };
 
-metadata* head = nullptr;
-metadata* tail = nullptr;
+metadata* head = NULL;
+metadata* tail = NULL;
 size_t num_free_blocks = 0;
 size_t num_allocated_bolcks = 0;
 size_t num_free_bytes = 0;
 size_t num_allocated_bytes = 0;
 
+
 void* malloc(size_t size){
     if(size == 0 || size > 100000000){
-        return nullptr;
+        return NULL;
     }
     metadata* iterator = head;
-    while(!iterator){
+    while(iterator){
         if(iterator->is_free && iterator->size > size){
             iterator->is_free = false;
             --num_free_blocks;
-            num_free_bytes -= size;
+            num_free_bytes -= iterator->size;
             return iterator->address;
         }
         iterator = iterator->next;
     }
-    auto metadata_pointer = sbrk(sizeof(metadata));
-    if(*metadata_pointer = -1){
-        return nullptr;
+    metadata* metadata_pointer = (metadata*)sbrk(sizeof(metadata));
+     
+    if(*((int*)metadata_pointer) == -1){
+        return NULL;
     }
-    (metadata)*metadata_pointer = {nullptr, tail, size, false, nullptr};
+    metadata_pointer->next= NULL;
+    metadata_pointer->prev=tail;
+    metadata_pointer->size=size;
+    metadata_pointer->is_free=false;
+    metadata_pointer->address= NULL;
     if(!head){
         head = metadata_pointer;
         tail = metadata_pointer;
@@ -51,9 +57,9 @@ void* malloc(size_t size){
         tail->next = metadata_pointer;
         tail = tail->next;
     }
-    auto address = sbrk(size);
-    if(*address = -1){
-        return nullptr;
+    void* address = sbrk(size);
+    if(*((int*)address) == -1){
+        return NULL;
     }
     metadata_pointer->address = address;
     ++num_allocated_bolcks;
@@ -62,9 +68,9 @@ void* malloc(size_t size){
 }
 
 void* calloc(size_t num, size_t size){
-    auto address = malloc(num*size);
+    void* address = malloc(num*size);
     if(!address){
-        return nullptr;
+        return NULL;
     }
     std::memset(address, 0, num*size);
     return address;
@@ -74,7 +80,7 @@ void free(void* p){
     if(!p)
         return;
     metadata* iterator = head;
-    while(!iterator){
+    while(iterator){
         if(iterator->address == p){
             if(iterator->is_free)
                 return;
@@ -87,9 +93,9 @@ void free(void* p){
 }
 
 void* realloc(void* oldp, size_t size){
-    auto pointer = malloc(size);
+    void* pointer = malloc(size);
     if(!pointer)
-        return nullptr;
+        return NULL;
     if(!oldp)
         return pointer;
     memcpy(pointer, oldp, size);
