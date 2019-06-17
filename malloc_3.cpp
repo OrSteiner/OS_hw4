@@ -1,5 +1,5 @@
 //
-// Created by orsht on 6/16/2019.
+// Created by orsht on 6/17/2019.
 //
 
 #include <unistd.h>
@@ -25,6 +25,23 @@ size_t num_free_bytes = 0;
 size_t num_allocated_bytes = 0;
 
 
+void* split(metadata* iterator, size_t size){
+    size_t old_size = iterator->size;
+    iterator->size = size;
+    metadata* data = (metadata*)(iterator->address + size);
+    data->next = iterator->next;
+    data->prev = iterator;
+    data->size = old_size - size - sizeof(metadata);
+    data->is_free = true;
+    data->address = iterator->address + size + sizeof(metadata);
+    iterator->next = data;
+    ++num_allocated_blocks;
+    num_allocated_bytes -= sizeof(metadata);
+    ++num_free_blocks;
+    num_free_bytes -= sizeof(metadata);
+    return iterator->address;
+}
+
 void* malloc(size_t size){
     if(size == 0 || size > 100000000){
         return NULL;
@@ -32,6 +49,9 @@ void* malloc(size_t size){
     metadata* iterator = head;
     while(iterator){
         if(iterator->is_free && iterator->size > size){
+            if(iterator->size - size - sizeof(metadata) >= 128){
+                iterator->address = split(iterator, size);
+            }
             iterator->is_free = false;
             --num_free_blocks;
             num_free_bytes -= iterator->size;
@@ -40,7 +60,7 @@ void* malloc(size_t size){
         iterator = iterator->next;
     }
     metadata* metadata_pointer = (metadata*)sbrk(sizeof(metadata));
-     
+
     if(*((int*)metadata_pointer) == -1){
         return NULL;
     }
