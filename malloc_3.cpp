@@ -96,6 +96,16 @@ void* calloc(size_t num, size_t size){
     return address;
 }
 
+void* unite(metadata* data1, metadata* data2){
+    data1->size += data2->size + sizeof(metadata);
+    data1->next = data2->next;
+    --num_free_blocks;
+    --num_allocated_blocks;
+    num_free_bytes += sizeof(metadata);
+    num_allocated_bytes += sizeof(metadata);
+    return data1;
+}
+
 void free(void* p){
     if(!p)
         return;
@@ -107,6 +117,13 @@ void free(void* p){
             iterator->is_free = true;
             ++num_free_blocks;
             num_free_bytes += iterator->size;
+            if(iterator->next->is_free){
+                iterattor = unite(iterator, iterator->next);
+            }
+            if(iterator->prev->is_free){
+                iterator = unite(iterator->prev, iterator);
+            }
+            return;
         }
         iterator = iterator->next;
     }
