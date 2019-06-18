@@ -93,6 +93,17 @@ void free(void* p){
 }
 
 void* realloc(void* oldp, size_t size){
+    metadata* iterator = head;
+    while(iterator){
+        if(iterator->address == oldp){
+            if(size >= iterator->size){
+                return iterator->address;
+            }
+            else
+                break;
+        }
+        iterator = iterator->next;
+    }
     void* pointer = malloc(size);
     if(!pointer)
         return NULL;

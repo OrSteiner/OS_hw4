@@ -25,6 +25,16 @@ size_t num_free_bytes = 0;
 size_t num_allocated_bytes = 0;
 
 
+void* unite(metadata* data1, metadata* data2){
+    data1->size += data2->size + sizeof(metadata);
+    data1->next = data2->next;
+    --num_free_blocks;
+    --num_allocated_blocks;
+    num_free_bytes += sizeof(metadata);
+    num_allocated_bytes += sizeof(metadata);
+    return data1;
+}
+
 void* split(metadata* iterator, size_t size){
     size_t old_size = iterator->size;
     iterator->size = size;
@@ -39,6 +49,9 @@ void* split(metadata* iterator, size_t size){
     num_allocated_bytes -= sizeof(metadata);
     ++num_free_blocks;
     num_free_bytes -= sizeof(metadata);
+    if(iterator->next->is_free){
+        unite(iterator, iterator->next);
+    }
     return iterator->address;
 }
 
@@ -59,7 +72,17 @@ void* malloc(size_t size){
         }
         iterator = iterator->next;
     }
-    metadata* metadata_pointer = (metadata*)sbrk(sizeof(metadata));
+    if(tail->is_free){ //extending the last block for the new size.
+        size_t extension = size - tail->size;
+        void* temp = sbrk(extension);
+        if(*((int*)temp) == -1){
+            return NULL;
+        }
+        tail->size = size;
+
+    }
+
+    metadata* metadata_pointer = (metadata*)sbrk((sizeof(metadata) + (4-(sizeof(metadata)%4))%4));
 
     if(*((int*)metadata_pointer) == -1){
         return NULL;
@@ -77,7 +100,7 @@ void* malloc(size_t size){
         tail->next = metadata_pointer;
         tail = tail->next;
     }
-    void* address = sbrk(size);
+    void* address = sbrk(size + (4-(size%4)%4));
     if(*((int*)address) == -1){
         return NULL;
     }
@@ -94,16 +117,6 @@ void* calloc(size_t num, size_t size){
     }
     std::memset(address, 0, num*size);
     return address;
-}
-
-void* unite(metadata* data1, metadata* data2){
-    data1->size += data2->size + sizeof(metadata);
-    data1->next = data2->next;
-    --num_free_blocks;
-    --num_allocated_blocks;
-    num_free_bytes += sizeof(metadata);
-    num_allocated_bytes += sizeof(metadata);
-    return data1;
 }
 
 void free(void* p){
@@ -130,6 +143,21 @@ void free(void* p){
 }
 
 void* realloc(void* oldp, size_t size){
+    metadata* iterator = head;
+    while(iterator){
+        if(iterator->address == oldp){
+            if(size <= iterator->size){
+                if(iterator->size - size - sizeof(metadata) >= 128){
+                    return split(iterator, size);
+                }
+                else
+                    return iterator->address;
+            }
+            else
+                break;
+        }
+        iterator = iterator->next;
+    }
     void* pointer = malloc(size);
     if(!pointer)
         return NULL;
