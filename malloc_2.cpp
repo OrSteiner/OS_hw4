@@ -44,11 +44,12 @@ void* malloc(size_t size){
     if(*((int*)metadata_pointer) == -1){
         return NULL;
     }
-    metadata_pointer->next = NULL;
-    metadata_pointer->prev = tail;
-    metadata_pointer->size = size;
-    metadata_pointer->is_free = false;
-    metadata_pointer->address = NULL;
+    
+    metadata_pointer->next= NULL;
+    metadata_pointer->prev=tail;
+    metadata_pointer->size=size;
+    metadata_pointer->is_free=false;
+    metadata_pointer->address= NULL;
     if(!head){
         head = metadata_pointer;
         tail = metadata_pointer;
