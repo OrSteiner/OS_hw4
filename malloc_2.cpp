@@ -96,7 +96,7 @@ void* realloc(void* oldp, size_t size){
     metadata* iterator = head;
     while(iterator){
         if(iterator->address == oldp){
-            if(size >= iterator->size){
+            if(size <= iterator->size){
                 return iterator->address;
             }
             else

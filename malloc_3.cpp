@@ -72,16 +72,20 @@ void* malloc(size_t size){
         }
         iterator = iterator->next;
     }
-    if(tail->is_free){ //extending the last block for the new size.
-        size_t extension = size - tail->size;
-        void* temp = sbrk(extension);
-        if(*((int*)temp) == -1){
-            return NULL;
+    if(tail){
+        if(tail->is_free){ //extending the last block for the new size.
+            size_t extension = size - tail->size;
+            void* temp = sbrk(extension);
+            if(*((int*)temp) == -1){
+                return NULL;
+            }
+            tail->size = size;
         }
-        tail->size = size;
-
     }
-
+    if(!head){
+        void* first_pointer = sbrk(0);
+        brk(first_pointer + (4 - (first_pointer%4))%4);
+    }
     metadata* metadata_pointer = (metadata*)sbrk((sizeof(metadata) + (4-(sizeof(metadata)%4))%4));
 
     if(*((int*)metadata_pointer) == -1){
