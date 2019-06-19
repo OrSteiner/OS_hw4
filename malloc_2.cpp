@@ -44,11 +44,11 @@ void* malloc(size_t size){
     if(*((int*)metadata_pointer) == -1){
         return NULL;
     }
-    metadata_pointer->next= NULL;
-    metadata_pointer->prev=tail;
-    metadata_pointer->size=size;
-    metadata_pointer->is_free=false;
-    metadata_pointer->address= NULL;
+    metadata_pointer->next = NULL;
+    metadata_pointer->prev = tail;
+    metadata_pointer->size = size;
+    metadata_pointer->is_free = false;
+    metadata_pointer->address = NULL;
     if(!head){
         head = metadata_pointer;
         tail = metadata_pointer;
@@ -62,7 +62,7 @@ void* malloc(size_t size){
         return NULL;
     }
     metadata_pointer->address = address;
-    ++num_allocated_bolcks;
+    ++num_allocated_blocks;
     num_allocated_bytes += size;
     return address;
 }
@@ -123,7 +123,7 @@ size_t _num_free_bytes(){
 }
 
 size_t _num_allocated_blocks(){
-    return num_allocated_bolcks;
+    return num_allocated_blocks;
 }
 
 size_t _num_allocated_bytes(){
@@ -131,7 +131,7 @@ size_t _num_allocated_bytes(){
 }
 
 size_t _num_meta_data_bytes(){
-    return sizeof(metadata)*num_allocated_bolcks;
+    return sizeof(metadata)*num_allocated_blocks;
 }
 
 size_t _size_meta_data(){
