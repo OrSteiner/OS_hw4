@@ -94,6 +94,8 @@ void free(void* p){
 }
 
 void* realloc(void* oldp, size_t size){
+    if(size == 0)
+      return NULL;
     metadata* iterator = head;
     while(iterator){
         if(iterator->address == oldp){

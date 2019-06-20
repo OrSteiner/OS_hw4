@@ -9,6 +9,7 @@
 
 
 
+
 struct metadata{
     metadata* next;
     metadata* prev;
@@ -24,44 +25,65 @@ size_t num_allocated_blocks = 0;
 size_t num_free_bytes = 0;
 size_t num_allocated_bytes = 0;
 
+void print_metadatas(){
+    metadata* iterator = head;
+    int i=1;
+     printf("start\n");
+    while(iterator){
+        printf("size = %d , num = %d , is free = %d ; ", (int)iterator->size ,i, (int)iterator->is_free);
+        ++i;
+        iterator = iterator->next;
+    }
+    printf("\n end \n");
+}
 
-void* unite(metadata* data1, metadata* data2){
+void unite(metadata* data1, metadata* data2){
     data1->size += data2->size + sizeof(metadata);
     data1->next = data2->next;
+    if(data2 == tail){
+        tail = data1;
+    }
+    else if(data2){
+        (data2->next)->prev = data1;
+    }
     --num_free_blocks;
     --num_allocated_blocks;
     num_free_bytes += sizeof(metadata);
-    num_allocated_bytes += sizeof(metadata);
-    return data1;
+    num_allocated_bytes += sizeof(metadata);   
 }
 
 void* split(metadata* iterator, size_t size){
     size_t old_size = iterator->size;
     iterator->size = size;
-    metadata* data = (metadata*)(iterator->address + size);
+    metadata* data = (metadata*)(((char*)iterator->address) + size);
     data->next = iterator->next;
     data->prev = iterator;
     data->size = old_size - size - sizeof(metadata);
     data->is_free = true;
-    data->address = iterator->address + size + sizeof(metadata);
+    data->address = ((char*)(iterator->address) + size + sizeof(metadata));
     iterator->next = data;
     ++num_allocated_blocks;
     num_allocated_bytes -= sizeof(metadata);
     ++num_free_blocks;
     num_free_bytes -= sizeof(metadata);
-    if(iterator->next->is_free){
-        unite(iterator, iterator->next);
+    if(iterator == tail){
+        tail = data;
+    }
+    if(data->next && data->next->is_free){
+        unite(data, data->next);
     }
     return iterator->address;
 }
 
 void* malloc(size_t size){
+
     if(size == 0 || size > 100000000){
         return NULL;
     }
+    size = size + ((4-(size%4))%4);
     metadata* iterator = head;
     while(iterator){
-        if(iterator->is_free && iterator->size > size){
+        if(iterator->is_free && iterator->size >= size){
             if(iterator->size - size - sizeof(metadata) >= 128){
                 iterator->address = split(iterator, size);
             }
@@ -80,14 +102,18 @@ void* malloc(size_t size){
                 return NULL;
             }
             tail->size = size;
-        }
+            tail->is_free = false;
+            --num_free_blocks;
+            num_free_bytes -= (tail->size-extension);
+            num_allocated_bytes += extension;
+            return tail->address;
+        } 
     }
     if(!head){
         void* first_pointer = sbrk(0);
-        brk(first_pointer + (4 - (first_pointer%4))%4);
+        brk((char*)(first_pointer) + (4 - ((int)(first_pointer)%4))%4);
     }
-    metadata* metadata_pointer = (metadata*)sbrk((sizeof(metadata) + (4-(sizeof(metadata)%4))%4));
-
+    metadata* metadata_pointer = (metadata*)sbrk(sizeof(metadata));
     if(*((int*)metadata_pointer) == -1){
         return NULL;
     }
@@ -104,12 +130,12 @@ void* malloc(size_t size){
         tail->next = metadata_pointer;
         tail = tail->next;
     }
-    void* address = sbrk(size + (4-(size%4)%4));
+    void* address = sbrk(size);
     if(*((int*)address) == -1){
         return NULL;
     }
     metadata_pointer->address = address;
-    ++num_allocated_bolcks;
+    ++num_allocated_blocks;
     num_allocated_bytes += size;
     return address;
 }
@@ -134,11 +160,12 @@ void free(void* p){
             iterator->is_free = true;
             ++num_free_blocks;
             num_free_bytes += iterator->size;
-            if(iterator->next->is_free){
-                iterattor = unite(iterator, iterator->next);
+            if(iterator->next && iterator->next->is_free){
+                unite(iterator, iterator->next);
             }
-            if(iterator->prev->is_free){
-                iterator = unite(iterator->prev, iterator);
+            
+            if(iterator->prev && iterator->prev->is_free){
+                unite(iterator->prev, iterator);
             }
             return;
         }
@@ -147,12 +174,18 @@ void free(void* p){
 }
 
 void* realloc(void* oldp, size_t size){
+    if(size == 0)
+      return NULL;
     metadata* iterator = head;
-    while(iterator){
+    bool wilderness = true;
+    while(iterator){  //in case that there is a place in the original block fo realloc.
         if(iterator->address == oldp){
             if(size <= iterator->size){
-                if(iterator->size - size - sizeof(metadata) >= 128){
-                    return split(iterator, size);
+                if((int)(iterator->size - size - sizeof(metadata)) >= 128){
+                    int leftover = (int)(iterator->size - size);
+                    void* retval = split(iterator, size);
+                    num_free_bytes += leftover;
+                    return retval;
                 }
                 else
                     return iterator->address;
@@ -162,9 +195,33 @@ void* realloc(void* oldp, size_t size){
         }
         iterator = iterator->next;
     }
+
+    if(iterator && iterator->next && iterator->next->is_free && iterator->size + iterator->next->size + sizeof(metadata) >= size){ //in case that there is place to realloc with the help of the next block.
+        num_free_bytes -= (size - iterator->size);
+        unite(iterator, iterator->next);
+        if((int)(iterator->size - size - sizeof(metadata)) >= 128) {
+            split(iterator, size);
+        }
+        return iterator->address;
+    }
+    if(tail && iterator == tail){  //in case that tail needs realloc and doesn't have enough room. needs to extend the wilderness.
+        if((int)sbrk(size - tail->size) != -1) {
+            num_allocated_bytes += size - tail->size;
+            tail->size = size;
+            return tail->address;
+        }
+    }
     void* pointer = malloc(size);
     if(!pointer)
         return NULL;
+        
+   // if(tail && tail->address == pointer){ //in case there wasn't a better slot without extension.
+   //     printf("check3\n");
+  //      memcpy(pointer, oldp, size);
+        
+  //      return pointer;
+  //  }
+
     if(!oldp)
         return pointer;
     memcpy(pointer, oldp, size);
@@ -181,7 +238,7 @@ size_t _num_free_bytes(){
 }
 
 size_t _num_allocated_blocks(){
-    return num_allocated_bolcks;
+    return num_allocated_blocks;
 }
 
 size_t _num_allocated_bytes(){
@@ -189,7 +246,7 @@ size_t _num_allocated_bytes(){
 }
 
 size_t _num_meta_data_bytes(){
-    return sizeof(metadata)*num_allocated_bolcks;
+    return sizeof(metadata)*num_allocated_blocks;
 }
 
 size_t _size_meta_data(){
