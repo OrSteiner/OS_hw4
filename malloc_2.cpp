@@ -3,7 +3,7 @@
 //
 
 #include <unistd.h>
-#include <stdlib.h>
+#include <cstdlib>
 #include <cstring>
 
 
@@ -31,7 +31,7 @@ void* malloc(size_t size){
     }
     metadata* iterator = head;
     while(iterator){
-        if(iterator->is_free && iterator->size > size){
+        if(iterator->is_free && iterator->size >= size){
             iterator->is_free = false;
             --num_free_blocks;
             num_free_bytes -= iterator->size;

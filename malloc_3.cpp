@@ -24,7 +24,7 @@ size_t num_free_blocks = 0;
 size_t num_allocated_blocks = 0;
 size_t num_free_bytes = 0;
 size_t num_allocated_bytes = 0;
-
+/*
 void print_metadatas(){
     metadata* iterator = head;
     int i=1;
@@ -36,6 +36,7 @@ void print_metadatas(){
     }
     printf("\n end \n");
 }
+*/
 
 void unite(metadata* data1, metadata* data2){
     data1->size += data2->size + sizeof(metadata);
@@ -62,6 +63,8 @@ void* split(metadata* iterator, size_t size){
     data->is_free = true;
     data->address = ((char*)(iterator->address) + size + sizeof(metadata));
     iterator->next = data;
+    if(data->next)
+      (data->next)->prev = data;
     ++num_allocated_blocks;
     num_allocated_bytes -= sizeof(metadata);
     ++num_free_blocks;
@@ -77,14 +80,14 @@ void* split(metadata* iterator, size_t size){
 
 void* malloc(size_t size){
 
-    if(size == 0 || size > 100000000){
+    if(size == 0 || size > 1e8){
         return NULL;
     }
     size = size + ((4-(size%4))%4);
     metadata* iterator = head;
     while(iterator){
         if(iterator->is_free && iterator->size >= size){
-            if(iterator->size - size - sizeof(metadata) >= 128){
+            if((int)(iterator->size - size - sizeof(metadata)) >= 128){
                 iterator->address = split(iterator, size);
             }
             iterator->is_free = false;
@@ -174,8 +177,10 @@ void free(void* p){
 }
 
 void* realloc(void* oldp, size_t size){
-    if(size == 0)
-      return NULL;
+    if(size == 0 || size > 1e8){
+        return NULL;
+    }
+    size = size + ((4-(size%4))%4);
     metadata* iterator = head;
     bool wilderness = true;
     while(iterator){  //in case that there is a place in the original block fo realloc.
